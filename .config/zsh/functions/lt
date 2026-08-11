@@ -1,0 +1,19 @@
+#!/usr/bin/env zsh
+# vim: ft=zsh
+
+lt() {
+  local depth=2
+  local -a args=()
+
+  if [[ $# -gt 0 ]]; then
+    if [[ "$1" =~ ^[0-9]+$ ]]; then
+      depth="$1"
+      shift
+      args=("$@")
+    else
+      args=("$@")
+    fi
+  fi
+
+  eza -lTh --icons=always --level "$depth" --group-directories-first --no-permissions --no-user --time-style '+%b-%d,%Y %H:%M' "${args[@]}"
+}

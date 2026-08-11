@@ -1,0 +1,204 @@
+#!/usr/bin/env zsh
+# vim: ft=zsh
+
+clean_flash_sofle() {
+  local qmk_home=""
+  if command -v qmk >/dev/null 2>&1; then
+    while IFS= read -r line; do
+      if [[ "$line" == QMK_HOME=* || "$line" == QMK_FIRMWARE=* ]]; then
+        echo "$line"
+      fi
+      if [[ "$line" == QMK_HOME=* ]]; then
+        qmk_home="${line#QMK_HOME=}"
+        qmk_home="${qmk_home#\"}"
+        qmk_home="${qmk_home%\"}"
+      fi
+    done < <(qmk env 2>/dev/null)
+  fi
+
+  if [[ -z "$qmk_home" ]]; then
+    qmk_home="/home/hope/full_vial_qmk_hope"
+  fi
+
+  local km="$1"
+  local side="$2"
+
+  if [[ -z "$km" ]]; then
+    echo "Error: Keymap not provided. Usage: clean_flash_sofle <keymap> <side>"
+    return 1
+  fi
+
+  side=$(echo "$side" | tr '[:upper:]' '[:lower:]')
+  if [[ "$side" != "left" && "$side" != "right" ]]; then
+    echo "Error: Please specify a valid side. Usage: clean_flash_sofle <keymap> left OR clean_flash_sofle <keymap> right"
+    return 1
+  fi
+
+  local comp_time
+  comp_time=$(date +"%Y%m%d_%H%M%S")
+  local target_file="sofle_rev1_${km}_${side}"
+  local final_target_file="sofle_rev1_${km}_${side}_${comp_time}"
+
+  local extra_flags
+  if [[ "$side" == "right" ]]; then
+    extra_flags="-DIS_RIGHT_SIDE"
+  else
+    extra_flags="-DIS_LEFT_SIDE"
+  fi
+
+  echo ""
+  echo "Starting clean compilation & compile_commands generation for the $side side..."
+  echo ""
+
+  local compile_start compile_end compile_diff
+  compile_start=$(date +%s)
+  qmk compile -c --compiledb -kb sofle/rev1 -km "$km" -e CONVERT_TO=kb2040 -e EXTRAFLAGS="$extra_flags" -e TARGET="$target_file"
+  local qmk_status=$?
+  compile_end=$(date +%s)
+  compile_diff=$(( compile_end - compile_start ))
+
+  if [[ $qmk_status -ne 0 ]]; then
+    echo ""
+    echo "Error: QMK compilation failed."
+    return 1
+  fi
+
+  echo ""
+  local raw_uf2_file="$qmk_home/.build/${target_file}_kb2040.uf2"
+  local uf2_file="$qmk_home/${final_target_file}_kb2040.uf2"
+
+  if [[ -f "$raw_uf2_file" ]]; then
+    echo "🏷️  Renaming compiled firmware with timestamp..."
+    echo "    From: $(basename "$raw_uf2_file")"
+    echo "    To:   $(basename "$uf2_file")"
+    cp "$raw_uf2_file" "$uf2_file"
+
+    local file_date file_size_bytes file_size_kb file_size_mb
+    file_date=$(date -r "$uf2_file" +"%Y-%m-%d %H:%M:%S")
+    file_size_bytes=$(stat -c%s "$uf2_file")
+    file_size_kb=$(printf "%.1f" $(( file_size_bytes / 1024.0 )))
+    file_size_mb=$(printf "%.2f" $(( file_size_bytes / 1048576.0 )))
+  else
+    echo "❌ Error: Firmware file $raw_uf2_file not found after compilation!"
+    return 1
+  fi
+
+  echo ""
+  echo "⏱️  Compile time: $compile_diff seconds"
+  echo "📄 Firmware file: $uf2_file"
+  echo "📅 Last modified: $file_date"
+  echo "📦 Size: $file_size_kb KB ($file_size_mb MB)"
+  echo ""
+
+  local upper_side
+  upper_side=$(echo "$side" | tr '[:lower:]' '[:upper:]')
+  echo "========================================="
+  echo "           $upper_side SIDE           "
+  echo "========================================="
+  echo ""
+
+  echo "🔑 Pre-authenticating sudo for mounting the drive..."
+  sudo -v
+  if [[ $? -ne 0 ]]; then
+    echo "❌ Sudo authentication failed. Exiting."
+    return 1
+  fi
+  echo ""
+
+  local retry_count=0
+  while true; do
+    local detected=0
+    if [[ ! -d /mnt/e ]]; then
+      sudo mkdir -p /mnt/e
+    fi
+
+    # Attempt mount using drvfs if not mounted
+    local newly_mounted=0
+    if ! mountpoint -q /mnt/e; then
+      if sudo mount -t drvfs E: /mnt/e 2>/dev/null; then
+        newly_mounted=1
+      fi
+    fi
+
+    if mountpoint -q /mnt/e; then
+      # If /mnt/e is mounted, check if it's the RP2040 bootloader
+      if [[ -f /mnt/e/INFO_UF2.TXT ]] || ls /mnt/e 2>/dev/null | grep -q -i "INFO_UF2"; then
+        detected=1
+      else
+        # Unmount if it's not the RP2040 bootloader
+        sudo umount /mnt/e 2>/dev/null || true
+      fi
+    fi
+
+    # Fallback check using cmd.exe if interop path is available
+    if [[ $detected -eq 0 ]] && command -v cmd.exe >/dev/null 2>&1; then
+      if cmd.exe /c "vol E:" 2>/dev/null | grep -q "RPI-RP2"; then
+        if ! mountpoint -q /mnt/e; then
+          sudo mount -t drvfs E: /mnt/e 2>/dev/null
+        fi
+        if mountpoint -q /mnt/e; then
+          detected=1
+        fi
+      fi
+    fi
+
+    if [[ $detected -eq 1 ]]; then
+      echo ""
+      echo ""
+      local flash_success=0
+      echo "🚀 Copying $uf2_file to /mnt/e/ ..."
+      cp "$uf2_file" /mnt/e/
+      flash_success=1
+
+      echo "🧹 Unmounting drive..."
+      sleep 1
+      sudo umount /mnt/e 2>/dev/null || true
+
+      if [[ $flash_success -eq 1 ]]; then
+        echo "🎉 Done! Your $side keyboard half is rebooting with new firmware."
+      else
+        echo "ℹ️ Clean up complete. No firmware was flashed."
+      fi
+
+      break
+    else
+      retry_count=$(( retry_count + 1 ))
+      local check_again="c"
+      local user_input=""
+      for i in {3..1}; do
+        printf "\r❌ [Retry %d] Not found on E:. ⏳ Retrying in %d sec (Enter=now, Q=quit)\e[K" "$retry_count" "$i"
+        
+        if read -k 1 -t 1 -r user_input 2>/dev/null; then
+          if [[ "$user_input" =~ ^[qQ]$ ]]; then
+            check_again="q"
+          fi
+          break
+        fi
+      done
+
+      if [[ "$check_again" == "q" ]]; then
+        echo ""
+        echo "Exiting..."
+        return 1
+      else
+        continue
+      fi
+    fi
+  done
+
+  echo ""
+  echo "🧹 Cleaning up old .uf2 files in $qmk_home..."
+  if [[ -d "$qmk_home" ]]; then
+    local latest_left latest_right
+    latest_left=$(find "$qmk_home" -maxdepth 1 -name "sofle*left*.uf2" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d" " -f2-)
+    latest_right=$(find "$qmk_home" -maxdepth 1 -name "sofle*right*.uf2" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d" " -f2-)
+
+    for f in $(find "$qmk_home" -maxdepth 1 -name "*.uf2" -type f 2>/dev/null); do
+      if [[ "$f" != "$latest_left" && "$f" != "$latest_right" ]]; then
+        rm -f "$f"
+      fi
+    done
+  fi
+}
+
+clean_flash_sofle "$@"

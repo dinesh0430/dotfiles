@@ -1,0 +1,35 @@
+#!/usr/bin/env zsh
+# vim: ft=zsh
+
+hope_alacritty_theme_picker() {
+  local config_file="/mnt/c/Users/dines/AppData/Roaming/alacritty/alacritty.toml"
+  
+  if [[ ! -f "$config_file" ]]; then
+    echo "Alacritty config file not found at $config_file"
+    return 1
+  fi
+
+  local original_theme
+  original_theme=$(grep -oP 'themes/[^\s"]+\.toml' "$config_file" | sed 's|themes/||')
+
+  cat <<'EOF' > /tmp/preview_theme.sh
+#!/usr/bin/env bash
+theme="$(echo "$1" | sed "s/'//g")"
+sed -i -E "s|themes/[^\"]+\.toml|themes/${theme}|g" "/mnt/c/Users/dines/AppData/Roaming/alacritty/alacritty.toml"
+EOF
+  chmod +x /tmp/preview_theme.sh
+
+  local chosen_theme
+  chosen_theme=$(ls /mnt/c/Users/dines/AppData/Roaming/alacritty/themes/*.toml 2>/dev/null | \
+    sed -E 's|.*/(.*)|\1|' | \
+    fzf --height 40% --layout=reverse --bind "focus:execute(/tmp/preview_theme.sh {})")
+
+  if [[ -z "$chosen_theme" ]]; then
+    echo "Selection cancelled. Restoring original theme..."
+    sed -i -E "s|themes/[^\"]+\.toml|themes/$original_theme|g" "$config_file"
+  else
+    echo "Theme changed to: $chosen_theme"
+  fi
+
+  rm -f /tmp/preview_theme.sh
+}

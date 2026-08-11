@@ -1,0 +1,34 @@
+#!/usr/bin/env zsh
+# vim: ft=zsh
+
+fzf_file_picker() {
+  local state_file
+  state_file=$(mktemp -t fzf_pwd.XXXXXX)
+  echo "$PWD" > "$state_file"
+
+  local mode_recursive="fd --type f --hidden --strip-cwd-prefix --exclude .git"
+  local mode_dirs_recursive="fd --type d --hidden --strip-cwd-prefix --exclude .git"
+  local mode_current_dir="fd --max-depth 1 --hidden --strip-cwd-prefix --exclude .git"
+  local header="[Tab]: Select | [Ctrl+F]: All Files | [Ctrl+D]: All Dirs | [Ctrl+L]: Current Dir | [Right]: Enter Dir | [Left]: Parent Dir"
+
+  local selected
+  selected=$(eval "$mode_recursive" | fzf --multi \
+    --header="$header" \
+    --prompt="Files Rec> " \
+    --preview-window=right:60%:wrap \
+    --height=80% \
+    --border=rounded \
+    --preview="cur=\$(cat \"$state_file\"); target={}; item=\"\$cur/\$target\"; if [ -d \"\$item\" ]; then eza --tree --level=2 --color=always \"\$item\"; else bat --color=always --style=numbers \"\$item\"; fi" \
+    --bind="ctrl-f:change-prompt(Files Rec> )+reload(echo \"$PWD\" > \"$state_file\"; $mode_recursive)" \
+    --bind="ctrl-d:change-prompt(Dirs Rec> )+reload(echo \"$PWD\" > \"$state_file\"; $mode_dirs_recursive)" \
+    --bind="ctrl-l:change-prompt(Dir Browse> )+reload(echo \"$PWD\" > \"$state_file\"; $mode_current_dir)" \
+    --bind="right:change-prompt(Dir Browse> )+reload(bash -c 'cur=\$(cat \"$state_file\"); target={}; item=\"\$cur/\$target\"; if [ -d \"\$item\" ]; then echo \"\$item\" > \"$state_file\"; cd \"\$item\" && $mode_current_dir; else cd \"\$cur\" && $mode_current_dir; fi')+clear-query" \
+    --bind="left:change-prompt(Dir Browse> )+reload(bash -c 'cur=\$(cat \"$state_file\"); parent=\$(dirname \"\$cur\"); echo \"\$parent\" > \"$state_file\"; cd \"\$parent\" && $mode_current_dir')+clear-query")
+
+  rm -f "$state_file"
+
+  if [[ -n "$selected" ]]; then
+    LBUFFER="${LBUFFER}${selected}"
+  fi
+  zle reset-prompt
+}

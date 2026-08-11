@@ -1,0 +1,17 @@
+gui:
+  wrapLinesInStagingView: false
+  theme:
+    selectedLineBgColor:
+      - reverse
+    selectedRangeBgColor:
+      - reverse
+git:
+  diffRenderers:
+    # 1. Your current side-by-side view
+    - colorArg: always
+      command: delta --dark --paging=never --side-by-side --line-numbers --syntax-theme=none
+    # 2. Your new inline view (identical to above, minus --side-by-side)
+    - colorArg: always
+      command: delta --dark --paging=never --line-numbers --syntax-theme=none
+    # 3. Native Lazygit view (an optional default fallback)
+    - type: rawGit

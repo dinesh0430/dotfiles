@@ -1,0 +1,17 @@
+#!/usr/bin/env zsh
+# vim: ft=zsh
+
+yazi_picker() {
+  local tmp
+  tmp=$(mktemp -t "yazi_picker.XXXXXX")
+  command yazi --chooser-file="$tmp"
+
+  if [[ -s "$tmp" ]]; then
+    local selections
+    selections=$(cat "$tmp" | tr '\n' ' ')
+    LBUFFER="${LBUFFER}${selections}"
+  fi
+
+  command rm -f "$tmp"
+  zle reset-prompt
+}

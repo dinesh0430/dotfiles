@@ -1,0 +1,6 @@
+#!/usr/bin/env zsh
+# vim: ft=zsh
+
+reset_cursor_to_beam() {
+  printf '\e[5 q'
+}

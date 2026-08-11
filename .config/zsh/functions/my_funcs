@@ -1,0 +1,9 @@
+#!/usr/bin/env zsh
+# vim: ft=zsh
+
+my_funcs() {
+  local f
+  for f in "$ZDOTDIR/functions"/*(:t); do
+    print -P "%F{cyan}󰡱%f  %F{green}${f}%f"
+  done
+}

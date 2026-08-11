@@ -1,0 +1,38 @@
+#compdef flash_sofle clean_flash_sofle
+# vim: ft=zsh
+
+_flash_sofle() {
+  local -a keymaps sides
+  local qmk_home=""
+
+  # Dynamically fetch QMK_HOME from qmk env if available
+  if command -v qmk >/dev/null 2>&1; then
+    while IFS= read -r line; do
+      if [[ "$line" == QMK_HOME=* ]]; then
+        qmk_home="${line#QMK_HOME=}"
+        qmk_home="${qmk_home#\"}"
+        qmk_home="${qmk_home%\"}"
+        break
+      fi
+    done < <(qmk env 2>/dev/null)
+  fi
+
+  if [[ -z "$qmk_home" ]]; then
+    qmk_home="/home/hope/full_vial_qmk_hope"
+  fi
+
+  _arguments -C \
+    '1:keymap:->keymaps' \
+    '2:side:(left right)'
+
+  case $state in
+    keymaps)
+      local keymap_path="$qmk_home/keyboards/sofle/rev1/keymaps"
+      if [[ -d "$keymap_path" ]]; then
+        keymaps=(${keymap_path}/*(/NF))
+        keymaps=(${keymaps:t})
+        _describe -t keymaps 'keymap' keymaps
+      fi
+      ;;
+  esac
+}
