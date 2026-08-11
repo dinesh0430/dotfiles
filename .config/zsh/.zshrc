@@ -39,7 +39,7 @@ autoload -Uz _zinit
 # ---------------------------------------------------------
 
 # Initialize Zsh's completion system (required for the completion strategy to work)
-fpath=("$ZDOTDIR/functions" $fpath)
+fpath=("$ZDOTDIR/custom_completions" "$ZDOTDIR/functions" $fpath)
 autoload -Uz compinit
 compinit
 
