@@ -21,8 +21,11 @@ abbr -f -q vs="cd ~/full_vial_qmk_hope/keyboards/sofle/rev1/keymaps/hp_km && nvi
 
 # Git shortcuts
 abbr -f -q g="git"
+abbr -f -q lg="lazygit"
 abbr -f -q gst="git status"
-abbr -f -q cfg="/usr/bin/git --git-dir=$HOME/.config/cfg.git/ --work-tree=$HOME"
+abbr -f -q cfg="/usr/bin/git --git-dir=$HOME/.config/.git/ --work-tree=$HOME"
+abbr -f -q cfs="cfg status"
+abbr -f -q cflg="lazygit --git-dir=$HOME/.config/.git/ --work-tree=$HOME"
 
 
 

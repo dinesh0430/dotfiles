@@ -137,4 +137,4 @@ zinit ice wait lucid
 zinit light zdharma-continuum/fast-syntax-highlighting
 
 # Dotfiles bare repository alias
-alias cfg='/usr/bin/git --git-dir=$HOME/.config/cfg.git/ --work-tree=$HOME'
+alias cfg='/usr/bin/git --git-dir=$HOME/.config/.git/ --work-tree=$HOME'
