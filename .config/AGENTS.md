@@ -18,6 +18,11 @@ Standard `git` commands executed directly inside subdirectories without specifyi
   ```
   *(Configured as alias `cflg` in zsh)*
 
+* **Pathspec Resolution & Absolute Paths**:
+  When executing dotfiles `git` commands from subdirectories (e.g. `~/.config/nvim`), Git resolves relative pathspecs against the *current working directory* (`$PWD`), not `$HOME`.
+  * ❌ **Avoid**: Passing relative paths like `.config/nvim/...` when running from `~/.config/nvim` (causes Git to search for `.config/nvim/.config/nvim/...` and fail with pathspec errors).
+  * ✅ **Always use full `$HOME` absolute paths** for file arguments (e.g. `git --git-dir=$HOME/.config/.git --work-tree=$HOME add $HOME/.config/nvim/...`), or run the command with working directory set to `$HOME`.
+
 ---
 
 ## 2. Git Operation Policies
@@ -55,9 +60,9 @@ When the user asks to commit changes, follow these exact steps:
      ```
 
 3. **Executing the Commit**:
-   * Stage relevant files:
+   * Stage relevant files using **absolute `$HOME/...` paths**:
      ```bash
-     git --git-dir=$HOME/.config/.git --work-tree=$HOME add <files...>
+     git --git-dir=$HOME/.config/.git --work-tree=$HOME add $HOME/.config/<file1> $HOME/.config/<file2>
      ```
    * Commit with multiple `-m` flags to separate subject line and body paragraphs cleanly:
      ```bash
