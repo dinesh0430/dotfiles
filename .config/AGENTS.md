@@ -39,10 +39,14 @@ Standard `git` commands executed directly inside subdirectories without specifyi
 
 When the user asks to commit changes, follow these exact steps:
 
-1. **Inspect Staged/Unstaged Changes**:
+1. **Inspect Staged/Unstaged Changes & Recent History**:
    * Run `git --git-dir=$HOME/.config/.git --work-tree=$HOME status` and `diff` (or `diff --cached`) to analyze exact modifications.
+   * Run `git --git-dir=$HOME/.config/.git --work-tree=$HOME log -n 3` to review recent commits and avoid duplicating descriptions of already-committed work.
 
-2. **Message Formatting Guidelines**:
+2. **Message Formatting & Delta Scoping Guidelines**:
+   * **Scope Strictly to Current Delta**:
+     * Describe ONLY the specific modifications introduced since `HEAD`.
+     * Do NOT re-state features, keybindings, or changes that were already committed in preceding steps of the conversation.
    * **Header/Summary**:
      * Keep to 50–72 characters.
      * Follow conventional commit format `<type>(<scope>): <short description>` using lowercase and imperative mood (e.g., `feat(ui): add search bar`, `refactor(zsh): move completion scripts`).
