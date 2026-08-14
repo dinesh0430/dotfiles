@@ -46,9 +46,9 @@ chars = "\u0000"
 | **Normal** | `<leader>r` | Sourced function | Reload Neovim config (clears `package.loaded` for `config.*` and `plugins.*`) |
 | **Normal** | `<leader>mt` | `<cmd>RenderMarkdown toggle<cr>` | Toggle Markdown render view on/off |
 | **Normal** | `<leader>ag` | `toggle_agy_float(nil)` | Toggle floating `agy` CLI terminal |
-| **Visual** | `<leader>ag` | `toggle_agy_float(text)` | Send selected text to floating `agy` terminal |
+| **Visual** | `<leader>ag` | `toggle_agy_float(payload)` | Send selected text with file & line context to floating `agy` terminal |
 | **Normal** | `<leader>as` | `toggle_agy_sidebar(nil)` | Toggle right sidebar `agy` terminal |
-| **Visual** | `<leader>as` | `toggle_agy_sidebar(text)` | Send selected text to sidebar `agy` terminal |
+| **Visual** | `<leader>as` | `toggle_agy_sidebar(payload)` | Send selected text with file & line context to sidebar `agy` terminal |
 
 ---
 

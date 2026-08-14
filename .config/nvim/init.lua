@@ -115,11 +115,15 @@ local function toggle_agy_float(text_to_paste)
 	vim.cmd('startinsert')
 end
 
--- Keymap 1: Normal mode toggle (Hide / Unhide Float Window)
-vim.keymap.set('n', '<leader>ag', function() toggle_agy_float(nil) end, { desc = "Toggle agy float window" })
+-- Helper to extract visually selected text with file and line context for LLM
+local function get_visual_selection_with_context()
+	-- Capture line bounds of visual selection before exiting visual mode
+	local start_line = vim.fn.line("v")
+	local end_line = vim.fn.line(".")
+	if start_line > end_line then
+		start_line, end_line = end_line, start_line
+	end
 
--- Keymap 2: Visual mode selection sender to Float Window
-vim.keymap.set('v', '<leader>ag', function()
 	-- Save registry state politely
 	local old_reg = vim.fn.getreg('v')
 	local old_regtype = vim.fn.getregtype('v')
@@ -133,9 +137,40 @@ vim.keymap.set('v', '<leader>ag', function()
 	-- Exit visual mode cleanly
 	vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<ESC>', true, false, true), 'n', true)
 
-	-- Open agy and paste the text
-	toggle_agy_float(text)
-end, { desc = "Send selection to agy float window" })
+	-- Resolve relative filepath if possible, otherwise buffer name
+	local filepath = vim.fn.expand('%:.')
+	if filepath == '' then
+		filepath = vim.fn.expand('%:p')
+	end
+
+	local ft = vim.bo.filetype or ""
+	local line_str = (start_line == end_line) and string.format("line %d", start_line) or string.format("lines %d-%d", start_line, end_line)
+
+	-- Format message with markdown code fence and file context for LLM
+	local trimmed_text = text:gsub("\n$", "")
+	if filepath ~= '' then
+		if ft ~= '' then
+			return string.format("In `%s` (%s):\n```%s\n%s\n```\n", filepath, line_str, ft, trimmed_text)
+		else
+			return string.format("In `%s` (%s):\n```\n%s\n```\n", filepath, line_str, trimmed_text)
+		end
+	else
+		if ft ~= '' then
+			return string.format("```%s\n%s\n```\n", ft, trimmed_text)
+		else
+			return text
+		end
+	end
+end
+
+-- Keymap 1: Normal mode toggle (Hide / Unhide Float Window)
+vim.keymap.set('n', '<leader>ag', function() toggle_agy_float(nil) end, { desc = "Toggle agy float window" })
+
+-- Keymap 2: Visual mode selection sender to Float Window
+vim.keymap.set('v', '<leader>ag', function()
+	local payload = get_visual_selection_with_context()
+	toggle_agy_float(payload)
+end, { desc = "Send selection with file context to agy float window" })
 
 
 local sidebar_buf = nil
@@ -228,16 +263,7 @@ vim.keymap.set('n', '<leader>as', function() toggle_agy_sidebar(nil) end, { desc
 
 -- Keymap 2: Visual mode selection sender to Sidebar
 vim.keymap.set('v', '<leader>as', function()
-	-- Save registry state politely
-	local old_reg = vim.fn.getreg('v')
-	local old_regtype = vim.fn.getregtype('v')
+	local payload = get_visual_selection_with_context()
+	toggle_agy_sidebar(payload)
+end, { desc = "Send selection with file context to agy sidebar" })
 
-	vim.cmd('normal! "vy')
-	local text = vim.fn.getreg('v')
-
-	-- Restore registry state
-	vim.fn.setreg('v', old_reg, old_regtype)
-
-	vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<ESC>', true, false, true), 'n', true)
-	toggle_agy_sidebar(text)
-end, { desc = "Send selection to agy sidebar" })
