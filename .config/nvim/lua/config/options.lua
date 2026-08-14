@@ -7,5 +7,9 @@ vim.opt.relativenumber = true
 vim.opt.cursorline = true
 vim.opt.shiftwidth = 4
 
+-- Search options
+vim.opt.ignorecase = true -- Case-insensitive search
+vim.opt.smartcase = true  -- Case-sensitive if uppercase characters are typed
+
 -- Check this for inspiration: https://github.com/nvim-lua/kickstart.nvim/blob/master/init.lua
 -- https://github.com/dinesh0430/dotfiles/blob/master/init.vim
