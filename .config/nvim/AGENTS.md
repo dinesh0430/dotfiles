@@ -49,6 +49,8 @@ chars = "\u0000"
 | **Visual** | `<leader>ag` | `toggle_agy_float(payload)` | Send selected text with file & line context to floating `agy` terminal |
 | **Normal** | `<leader>as` | `toggle_agy_sidebar(nil)` | Toggle right sidebar `agy` terminal |
 | **Visual** | `<leader>as` | `toggle_agy_sidebar(payload)` | Send selected text with file & line context to sidebar `agy` terminal |
+| **Normal** | `<leader>oc` | `toggle_opencode_float(nil)` | Toggle floating `opencode` CLI terminal |
+| **Visual** | `<leader>oc` | `toggle_opencode_float(payload)` | Send selected text with file & line context to floating `opencode` terminal |
 | **Normal** | `<leader>lg` | `<cmd>LazyGit<cr>` | Open Lazygit dashboard |
 | **Normal** | `<leader>ld` | Sourced function | Open Lazygit directly in maximized full-screen Diff / Staging view |
 

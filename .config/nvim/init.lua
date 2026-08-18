@@ -32,8 +32,11 @@ vim.api.nvim_create_autocmd("VimLeave", {
 	end
 })
 
-local float_buf = nil
-local float_win = nil
+local agy_float_buf = nil
+local agy_float_win = nil
+
+local opencode_float_buf = nil
+local opencode_float_win = nil
 
 -- Helper to calculate responsive floating window dimensions
 local function get_win_opts()
@@ -48,71 +51,6 @@ local function get_win_opts()
 		style = 'minimal',
 		border = 'rounded'
 	}
-end
-
--- The main toggle function for the float window
-local function toggle_agy_float(text_to_paste)
-	-- 1. If window is open and we are NOT pasting text, hide it (toggle behavior)
-	if float_win and vim.api.nvim_win_is_valid(float_win) then
-		if not text_to_paste then
-			vim.api.nvim_win_close(float_win, true)
-			float_win = nil
-			return
-		else
-			-- If window is open and we are pasting, make sure it is focused
-			vim.api.nvim_set_current_win(float_win)
-		end
-	end
-
-	-- 2. Create the persistent buffer if it doesn't exist or was killed
-	if not float_buf or not vim.api.nvim_buf_is_valid(float_buf) then
-		float_buf = vim.api.nvim_create_buf(false, true)
-		-- Open the window first to establish terminal dimensions
-		float_win = vim.api.nvim_open_win(float_buf, true, get_win_opts())
-
-		-- Setup buffer-local keymap to close floating window from inside terminal
-		vim.keymap.set('t', '<Esc><Esc>', function()
-			if float_win and vim.api.nvim_win_is_valid(float_win) then
-				vim.api.nvim_win_close(float_win, true)
-				float_win = nil
-			end
-		end, { buffer = float_buf, desc = "Hide agy float from inside terminal" })
-
-		-- Start the job inside the terminal buffer using the non-deprecated jobstart
-		vim.api.nvim_buf_call(float_buf, function()
-			vim.fn.jobstart({ 'agy' }, {
-				term = true,
-				on_exit = function()
-					if float_win and vim.api.nvim_win_is_valid(float_win) then
-						vim.api.nvim_win_close(float_win, true)
-					end
-					float_buf = nil
-					float_win = nil
-				end
-			})
-		end)
-	else
-		-- Buffer exists, reopen the window pointing to it (if not already open)
-		if not float_win or not vim.api.nvim_win_is_valid(float_win) then
-			float_win = vim.api.nvim_open_win(float_buf, true, get_win_opts())
-		end
-	end
-
-	-- 3. If text was passed from a visual selection, send it to the terminal channel
-	if text_to_paste then
-		-- Small delay ensures the terminal is fully ready to accept input
-		vim.defer_fn(function()
-			local chans = vim.api.nvim_list_chans()
-			for _, chan in ipairs(chans) do
-				if chan.buffer == float_buf then
-					vim.api.nvim_chan_send(chan.id, text_to_paste)
-					break
-				end
-			end
-		end, 50)
-	end
-
-	vim.cmd('startinsert')
 end
 
 -- Helper to extract visually selected text with file and line context for LLM
@@ -163,14 +101,149 @@ local function get_visual_selection_with_context()
 	end
 end
 
--- Keymap 1: Normal mode toggle (Hide / Unhide Float Window)
-vim.keymap.set('n', '<leader>ag', function() toggle_agy_float(nil) end, { desc = "Toggle agy float window" })
+-- The main toggle function for the agy float window
+local function toggle_agy_float(text_to_paste)
+	-- 1. If window is open and we are NOT pasting text, hide it (toggle behavior)
+	if agy_float_win and vim.api.nvim_win_is_valid(agy_float_win) then
+		if not text_to_paste then
+			vim.api.nvim_win_close(agy_float_win, true)
+			agy_float_win = nil
+			return
+		else
+			-- If window is open and we are pasting, make sure it is focused
+			vim.api.nvim_set_current_win(agy_float_win)
+		end
+	end
 
--- Keymap 2: Visual mode selection sender to Float Window
+	-- 2. Create the persistent buffer if it doesn't exist or was killed
+	if not agy_float_buf or not vim.api.nvim_buf_is_valid(agy_float_buf) then
+		agy_float_buf = vim.api.nvim_create_buf(false, true)
+		-- Open the window first to establish terminal dimensions
+		agy_float_win = vim.api.nvim_open_win(agy_float_buf, true, get_win_opts())
+
+		-- Setup buffer-local keymap to close floating window from inside terminal
+		vim.keymap.set('t', '<Esc><Esc>', function()
+			if agy_float_win and vim.api.nvim_win_is_valid(agy_float_win) then
+				vim.api.nvim_win_close(agy_float_win, true)
+				agy_float_win = nil
+			end
+		end, { buffer = agy_float_buf, desc = "Hide agy float from inside terminal" })
+
+		-- Start the job inside the terminal buffer using the non-deprecated jobstart
+		vim.api.nvim_buf_call(agy_float_buf, function()
+			vim.fn.jobstart({ 'agy' }, {
+				term = true,
+				on_exit = function()
+					if agy_float_win and vim.api.nvim_win_is_valid(agy_float_win) then
+						vim.api.nvim_win_close(agy_float_win, true)
+					end
+					agy_float_buf = nil
+					agy_float_win = nil
+				end
+			})
+		end)
+	else
+		-- Buffer exists, reopen the window pointing to it (if not already open)
+		if not agy_float_win or not vim.api.nvim_win_is_valid(agy_float_win) then
+			agy_float_win = vim.api.nvim_open_win(agy_float_buf, true, get_win_opts())
+		end
+	end
+
+	-- 3. If text was passed from a visual selection, send it to the terminal channel
+	if text_to_paste then
+		-- Small delay ensures the terminal is fully ready to accept input
+		vim.defer_fn(function()
+			local chans = vim.api.nvim_list_chans()
+			for _, chan in ipairs(chans) do
+				if chan.buffer == agy_float_buf then
+					vim.api.nvim_chan_send(chan.id, text_to_paste)
+					break
+				end
+			end
+		end, 50)
+	end
+
+	vim.cmd('startinsert')
+end
+
+-- Keymap: agy float window
+vim.keymap.set('n', '<leader>ag', function() toggle_agy_float(nil) end, { desc = "Toggle agy float window" })
 vim.keymap.set('v', '<leader>ag', function()
 	local payload = get_visual_selection_with_context()
 	toggle_agy_float(payload)
 end, { desc = "Send selection with file context to agy float window" })
+
+-- The main toggle function for the opencode float window
+local function toggle_opencode_float(text_to_paste)
+	-- 1. If window is open and we are NOT pasting text, hide it (toggle behavior)
+	if opencode_float_win and vim.api.nvim_win_is_valid(opencode_float_win) then
+		if not text_to_paste then
+			vim.api.nvim_win_close(opencode_float_win, true)
+			opencode_float_win = nil
+			return
+		else
+			-- If window is open and we are pasting, make sure it is focused
+			vim.api.nvim_set_current_win(opencode_float_win)
+		end
+	end
+
+	-- 2. Create the persistent buffer if it doesn't exist or was killed
+	if not opencode_float_buf or not vim.api.nvim_buf_is_valid(opencode_float_buf) then
+		opencode_float_buf = vim.api.nvim_create_buf(false, true)
+		-- Open the window first to establish terminal dimensions
+		opencode_float_win = vim.api.nvim_open_win(opencode_float_buf, true, get_win_opts())
+
+		-- Setup buffer-local keymap to close floating window from inside terminal
+		vim.keymap.set('t', '<Esc><Esc>', function()
+			if opencode_float_win and vim.api.nvim_win_is_valid(opencode_float_win) then
+				vim.api.nvim_win_close(opencode_float_win, true)
+				opencode_float_win = nil
+			end
+		end, { buffer = opencode_float_buf, desc = "Hide opencode float from inside terminal" })
+
+		-- Start the job inside the terminal buffer using the non-deprecated jobstart
+		vim.api.nvim_buf_call(opencode_float_buf, function()
+			vim.fn.jobstart({ 'opencode' }, {
+				term = true,
+				on_exit = function()
+					if opencode_float_win and vim.api.nvim_win_is_valid(opencode_float_win) then
+						vim.api.nvim_win_close(opencode_float_win, true)
+					end
+					opencode_float_buf = nil
+					opencode_float_win = nil
+				end
+			})
+		end)
+	else
+		-- Buffer exists, reopen the window pointing to it (if not already open)
+		if not opencode_float_win or not vim.api.nvim_win_is_valid(opencode_float_win) then
+			opencode_float_win = vim.api.nvim_open_win(opencode_float_buf, true, get_win_opts())
+		end
+	end
+
+	-- 3. If text was passed from a visual selection, send it to the terminal channel
+	if text_to_paste then
+		-- Small delay ensures the terminal is fully ready to accept input
+		vim.defer_fn(function()
+			local chans = vim.api.nvim_list_chans()
+			for _, chan in ipairs(chans) do
+				if chan.buffer == opencode_float_buf then
+					vim.api.nvim_chan_send(chan.id, text_to_paste)
+					break
+				end
+			end
+		end, 50)
+	end
+
+	vim.cmd('startinsert')
+end
+
+-- Keymap: opencode float window
+vim.keymap.set('n', '<leader>oc', function() toggle_opencode_float(nil) end, { desc = "Toggle opencode float window" })
+vim.keymap.set('v', '<leader>oc', function()
+	local payload = get_visual_selection_with_context()
+	toggle_opencode_float(payload)
+end, { desc = "Send selection with file context to opencode float window" })
 
 
 local sidebar_buf = nil
