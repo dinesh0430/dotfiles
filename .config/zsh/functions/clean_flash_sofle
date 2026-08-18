@@ -20,6 +20,46 @@ clean_flash_sofle() {
     qmk_home="/home/hope/full_vial_qmk_hope"
   fi
 
+  _cleanup_uf2() {
+    echo ""
+    echo "🧹 Cleaning up old .uf2 files in $qmk_home..."
+    if [[ -d "$qmk_home" ]]; then
+      local latest_left latest_right
+      latest_left=$(find "$qmk_home" -maxdepth 1 -iname "*left*.uf2" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d" " -f2-)
+      latest_right=$(find "$qmk_home" -maxdepth 1 -iname "*right*.uf2" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d" " -f2-)
+
+      local left_total=0 left_deleted=0
+      local right_total=0 right_deleted=0
+      local other_total=0 other_deleted=0
+
+      local f fname
+      while IFS= read -r f; do
+        [[ -z "$f" ]] && continue
+        fname="${f:t}"
+        if [[ "$fname" == *[Ll][Ee][Ff][Tt]* ]]; then
+          (( left_total++ ))
+          if [[ "$f" != "$latest_left" ]]; then
+            rm -f "$f" && (( left_deleted++ ))
+          fi
+        elif [[ "$fname" == *[Rr][Ii][Gg][Hh][Tt]* ]]; then
+          (( right_total++ ))
+          if [[ "$f" != "$latest_right" ]]; then
+            rm -f "$f" && (( right_deleted++ ))
+          fi
+        else
+          (( other_total++ ))
+          rm -f "$f" && (( other_deleted++ ))
+        fi
+      done < <(find "$qmk_home" -maxdepth 1 -name "*.uf2" -type f 2>/dev/null)
+
+      echo "   • Left side:  $left_total present ($left_deleted deleted, $(( left_total - left_deleted )) kept)"
+      echo "   • Right side: $right_total present ($right_deleted deleted, $(( right_total - right_deleted )) kept)"
+      if (( other_total > 0 )); then
+        echo "   • Other:      $other_total present ($other_deleted deleted)"
+      fi
+    fi
+  }
+
   local km="$1"
   local side="$2"
 
@@ -179,6 +219,7 @@ clean_flash_sofle() {
       if [[ "$check_again" == "q" ]]; then
         echo ""
         echo "Exiting..."
+        _cleanup_uf2
         return 1
       else
         continue
@@ -186,19 +227,7 @@ clean_flash_sofle() {
     fi
   done
 
-  echo ""
-  echo "🧹 Cleaning up old .uf2 files in $qmk_home..."
-  if [[ -d "$qmk_home" ]]; then
-    local latest_left latest_right
-    latest_left=$(find "$qmk_home" -maxdepth 1 -name "sofle*left*.uf2" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d" " -f2-)
-    latest_right=$(find "$qmk_home" -maxdepth 1 -name "sofle*right*.uf2" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d" " -f2-)
-
-    for f in $(find "$qmk_home" -maxdepth 1 -name "*.uf2" -type f 2>/dev/null); do
-      if [[ "$f" != "$latest_left" && "$f" != "$latest_right" ]]; then
-        rm -f "$f"
-      fi
-    done
-  fi
+  _cleanup_uf2
 }
 
 clean_flash_sofle "$@"
