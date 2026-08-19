@@ -1,4 +1,8 @@
 extensions:
   uf2:
+    filename:
+      foreground: Magenta
     icon:
       glyph: ""
+      style:
+        foreground: Magenta
