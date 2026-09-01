@@ -2,6 +2,28 @@
 # vim: ft=zsh
 
 flash_sofle() {
+  local km="$1"
+  local side="$2"
+
+  if [[ -z "$km" ]]; then
+    echo "Error: Keymap not provided. Usage: flash_sofle <keymap> <side>"
+    return 1
+  fi
+
+  side=$(echo "$side" | tr '[:upper:]' '[:lower:]')
+  if [[ "$side" != "left" && "$side" != "right" ]]; then
+    echo "Error: Please specify a valid side. Usage: flash_sofle <keymap> left OR flash_sofle <keymap> right"
+    return 1
+  fi
+
+  echo "🔑 Pre-authenticating sudo for mounting the drive..."
+  sudo -v
+  if [[ $? -ne 0 ]]; then
+    echo "❌ Sudo authentication failed. Exiting."
+    return 1
+  fi
+  echo ""
+
   local qmk_home=""
   if command -v qmk >/dev/null 2>&1; then
     while IFS= read -r line; do
@@ -59,20 +81,6 @@ flash_sofle() {
       fi
     fi
   }
-
-  local km="$1"
-  local side="$2"
-
-  if [[ -z "$km" ]]; then
-    echo "Error: Keymap not provided. Usage: flash_sofle <keymap> <side>"
-    return 1
-  fi
-
-  side=$(echo "$side" | tr '[:upper:]' '[:lower:]')
-  if [[ "$side" != "left" && "$side" != "right" ]]; then
-    echo "Error: Please specify a valid side. Usage: flash_sofle <keymap> left OR flash_sofle <keymap> right"
-    return 1
-  fi
 
   local comp_time
   comp_time=$(date +"%Y%m%d_%H%M%S")
@@ -135,14 +143,6 @@ flash_sofle() {
   echo "========================================="
   echo "           $upper_side SIDE           "
   echo "========================================="
-  echo ""
-
-  echo "🔑 Pre-authenticating sudo for mounting the drive..."
-  sudo -v
-  if [[ $? -ne 0 ]]; then
-    echo "❌ Sudo authentication failed. Exiting."
-    return 1
-  fi
   echo ""
 
   local retry_count=0
