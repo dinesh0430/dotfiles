@@ -2,18 +2,15 @@
 # vim: ft=zsh
 
 flash_sofle() {
-  local km="$1"
-  local side="$2"
+  local km="${1:-hp_km}"
+  local extra_arg="$2"
 
-  if [[ -z "$km" ]]; then
-    echo "Error: Keymap not provided. Usage: flash_sofle <keymap> <side>"
-    return 1
-  fi
-
-  side=$(echo "$side" | tr '[:upper:]' '[:lower:]')
-  if [[ "$side" != "left" && "$side" != "right" ]]; then
-    echo "Error: Please specify a valid side. Usage: flash_sofle <keymap> left OR flash_sofle <keymap> right"
-    return 1
+  # Backward compatibility: if someone calls `flash_sofle left` or `flash_sofle hp_km left`
+  if [[ "$km" == "left" || "$km" == "right" ]]; then
+    echo "ℹ️  Unified firmware builds a single binary for both halves. Using keymap: hp_km"
+    km="hp_km"
+  elif [[ -n "$extra_arg" ]]; then
+    echo "ℹ️  Unified firmware builds a single binary for both halves. Side argument '$extra_arg' is no longer needed."
   fi
 
   echo "🔑 Pre-authenticating sudo for mounting the drive..."
@@ -46,73 +43,57 @@ flash_sofle() {
     echo ""
     echo "🧹 Cleaning up old .uf2 files in $qmk_home..."
     if [[ -d "$qmk_home" ]]; then
-      local latest_left latest_right
-      latest_left=$(find "$qmk_home" -maxdepth 1 -iname "*left*.uf2" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d" " -f2-)
-      latest_right=$(find "$qmk_home" -maxdepth 1 -iname "*right*.uf2" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d" " -f2-)
+      local latest_unified
+      latest_unified=$(find "$qmk_home" -maxdepth 1 -name "sofle_rev1_${km}_*.uf2" -type f -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n 1 | cut -d" " -f2-)
 
-      local left_total=0 left_deleted=0
-      local right_total=0 right_deleted=0
+      local unified_total=0 unified_deleted=0
       local other_total=0 other_deleted=0
 
       local f fname
       while IFS= read -r f; do
         [[ -z "$f" ]] && continue
         fname="${f:t}"
-        if [[ "$fname" == *[Ll][Ee][Ff][Tt]* ]]; then
-          (( left_total++ ))
-          if [[ "$f" != "$latest_left" ]]; then
-            rm -f "$f" && (( left_deleted++ ))
+        if [[ "$fname" == sofle_rev1_${km}_[0-9]*_kb2040.uf2 ]]; then
+          (( unified_total++ ))
+          if [[ "$f" != "$latest_unified" ]]; then
+            rm -f "$f" && (( unified_deleted++ ))
           fi
-        elif [[ "$fname" == *[Rr][Ii][Gg][Hh][Tt]* ]]; then
-          (( right_total++ ))
-          if [[ "$f" != "$latest_right" ]]; then
-            rm -f "$f" && (( right_deleted++ ))
-          fi
-        else
+        elif [[ "$fname" == *[Ll][Ee][Ff][Tt]*.uf2 || "$fname" == *[Rr][Ii][Gg][Hh][Tt]*.uf2 ]]; then
           (( other_total++ ))
           rm -f "$f" && (( other_deleted++ ))
         fi
       done < <(find "$qmk_home" -maxdepth 1 -name "*.uf2" -type f 2>/dev/null)
 
-      echo "   • Left side:  $left_total present ($left_deleted deleted, $(( left_total - left_deleted )) kept)"
-      echo "   • Right side: $right_total present ($right_deleted deleted, $(( right_total - right_deleted )) kept)"
+      echo "   • Unified firmware: $unified_total present ($unified_deleted deleted, $(( unified_total - unified_deleted )) kept)"
       if (( other_total > 0 )); then
-        echo "   • Other:      $other_total present ($other_deleted deleted)"
+        echo "   • Legacy side files: $other_total deleted"
       fi
     fi
   }
 
   local comp_time
   comp_time=$(date +"%Y%m%d_%H%M%S")
-  local target_file="sofle_rev1_${km}_${side}"
-  local final_target_file="sofle_rev1_${km}_${side}_${comp_time}"
-
-  local extra_flags
-  if [[ "$side" == "right" ]]; then
-    extra_flags="-DIS_RIGHT_SIDE"
-  else
-    extra_flags="-DIS_LEFT_SIDE"
-  fi
+  local final_target_file="sofle_rev1_${km}_${comp_time}"
 
   echo ""
-  echo "Starting compilation for the $side side..."
+  echo "🚀 Starting compilation for unified firmware (Sofle Rev1 / $km)..."
   echo ""
 
   local compile_start compile_end compile_diff
   compile_start=$(date +%s)
-  qmk compile -kb sofle/rev1 -km "$km" -e CONVERT_TO=kb2040 -e EXTRAFLAGS="$extra_flags" -e TARGET="$target_file"
+  qmk compile -kb sofle/rev1 -km "$km" -e CONVERT_TO=kb2040
   local qmk_status=$?
   compile_end=$(date +%s)
   compile_diff=$(( compile_end - compile_start ))
 
   if [[ $qmk_status -ne 0 ]]; then
     echo ""
-    echo "Error: QMK compilation failed."
+    echo "❌ Error: QMK compilation failed."
     return 1
   fi
 
   echo ""
-  local raw_uf2_file="$qmk_home/.build/${target_file}_kb2040.uf2"
+  local raw_uf2_file="$qmk_home/.build/sofle_rev1_${km}_kb2040.uf2"
   local uf2_file="$qmk_home/${final_target_file}_kb2040.uf2"
 
   if [[ -f "$raw_uf2_file" ]]; then
@@ -137,95 +118,109 @@ flash_sofle() {
   echo "📅 Last modified: $file_date"
   echo "📦 Size: $file_size_kb KB ($file_size_mb MB)"
   echo ""
-
-  local upper_side
-  upper_side=$(echo "$side" | tr '[:lower:]' '[:upper:]')
   echo "========================================="
-  echo "           $upper_side SIDE           "
+  echo "       UNIFIED SOFLE FIRMWARE            "
+  echo "  (Flash this same file to BOTH halves)  "
   echo "========================================="
   echo ""
 
-  local retry_count=0
-  while true; do
-    local detected=0
-    if [[ ! -d /mnt/e ]]; then
-      sudo mkdir -p /mnt/e
-    fi
+  local flashed_halves=0
 
-    # Attempt mount using drvfs if not mounted
-    local newly_mounted=0
-    if ! mountpoint -q /mnt/e; then
-      if sudo mount -t drvfs E: /mnt/e 2>/dev/null; then
-        newly_mounted=1
+  _flash_drive() {
+    local retry_count=0
+    local prompt_msg="$1"
+
+    echo "$prompt_msg"
+    echo ""
+
+    while true; do
+      local detected=0
+      if [[ ! -d /mnt/e ]]; then
+        sudo mkdir -p /mnt/e
       fi
-    fi
 
-    if mountpoint -q /mnt/e; then
-      # If /mnt/e is mounted, check if it's the RP2040 bootloader
-      if [[ -f /mnt/e/INFO_UF2.TXT ]] || ls /mnt/e 2>/dev/null | grep -q -i "INFO_UF2"; then
-        detected=1
-      else
-        # Unmount if it's not the RP2040 bootloader
-        sudo umount /mnt/e 2>/dev/null || true
+      # Attempt mount using drvfs if not mounted
+      if ! mountpoint -q /mnt/e; then
+        sudo mount -t drvfs E: /mnt/e 2>/dev/null
       fi
-    fi
 
-    # Fallback check using cmd.exe if interop path is available
-    if [[ $detected -eq 0 ]] && command -v cmd.exe >/dev/null 2>&1; then
-      if cmd.exe /c "vol E:" 2>/dev/null | grep -q "RPI-RP2"; then
-        if ! mountpoint -q /mnt/e; then
-          sudo mount -t drvfs E: /mnt/e 2>/dev/null
-        fi
-        if mountpoint -q /mnt/e; then
+      if mountpoint -q /mnt/e; then
+        # Check if it's the RP2040 bootloader
+        if [[ -f /mnt/e/INFO_UF2.TXT ]] || ls /mnt/e 2>/dev/null | grep -q -i "INFO_UF2"; then
           detected=1
+        else
+          sudo umount /mnt/e 2>/dev/null || true
         fi
       fi
-    fi
 
-    if [[ $detected -eq 1 ]]; then
-      echo ""
-      echo ""
-      local flash_success=0
-      echo "🚀 Copying $uf2_file to /mnt/e/ ..."
-      cp "$uf2_file" /mnt/e/
-      flash_success=1
-
-      echo "🧹 Unmounting drive..."
-      sleep 1
-      sudo umount /mnt/e 2>/dev/null || true
-
-      if [[ $flash_success -eq 1 ]]; then
-        echo "🎉 Done! Your $side keyboard half is rebooting with new firmware."
-      else
-        echo "ℹ️ Clean up complete. No firmware was flashed."
-      fi
-
-      break
-    else
-      retry_count=$(( retry_count + 1 ))
-      local check_again="c"
-      local user_input=""
-      for i in {3..1}; do
-        printf "\r❌ [Retry %d] Not found on E:. ⏳ Retrying in %d sec (Enter=now, Q=quit)\e[K" "$retry_count" "$i"
-        
-        if read -k 1 -t 1 -r user_input 2>/dev/null; then
-          if [[ "$user_input" =~ ^[qQ]$ ]]; then
-            check_again="q"
+      # Fallback check using cmd.exe if interop path is available
+      if [[ $detected -eq 0 ]] && command -v cmd.exe >/dev/null 2>&1; then
+        if cmd.exe /c "vol E:" 2>/dev/null | grep -q "RPI-RP2"; then
+          if ! mountpoint -q /mnt/e; then
+            sudo mount -t drvfs E: /mnt/e 2>/dev/null
           fi
-          break
+          if mountpoint -q /mnt/e; then
+            detected=1
+          fi
         fi
-      done
-
-      if [[ "$check_again" == "q" ]]; then
-        echo ""
-        echo "Exiting..."
-        _cleanup_uf2
-        return 1
-      else
-        continue
       fi
+
+      if [[ $detected -eq 1 ]]; then
+        echo ""
+        echo "🚀 Copying $uf2_file to /mnt/e/ ..."
+        cp "$uf2_file" /mnt/e/
+
+        echo "🧹 Unmounting drive..."
+        sleep 1
+        sudo umount /mnt/e 2>/dev/null || true
+
+        (( flashed_halves++ ))
+        echo "🎉 Done! Half #$flashed_halves has rebooted with new firmware."
+        return 0
+      else
+        retry_count=$(( retry_count + 1 ))
+        local check_again="c"
+        local user_input=""
+        for i in {3..1}; do
+          printf "\r❌ [Retry %d] Not found on E:. ⏳ Waiting for bootloader drive (Enter=retry, Q=skip/quit)\e[K" "$retry_count"
+          if read -k 1 -t 1 -r user_input 2>/dev/null; then
+            if [[ "$user_input" =~ ^[qQ]$ ]]; then
+              check_again="q"
+            fi
+            break
+          fi
+        done
+
+        if [[ "$check_again" == "q" ]]; then
+          echo ""
+          return 1
+        fi
+      fi
+    done
+  }
+
+  # First half
+  if _flash_drive "👉 Put your FIRST half into bootloader mode (double-tap reset)..."; then
+    echo ""
+    echo "--------------------------------------------------------"
+    echo "💡 Would you like to flash the SECOND half now? (Y/n)"
+    echo "   (Double-tap reset on the other half, or press Q/n to finish)"
+    echo "--------------------------------------------------------"
+
+    local next_input=""
+    read -k 1 -r next_input
+    echo ""
+    if [[ ! "$next_input" =~ ^[nNqQ]$ ]]; then
+      _flash_drive "👉 Put your SECOND half into bootloader mode (double-tap reset)..."
     fi
-  done
+  fi
+
+  echo ""
+  if (( flashed_halves > 0 )); then
+    echo "✨ All done! Flashed $flashed_halves half/halves with $uf2_file."
+  else
+    echo "ℹ️  No halves were flashed."
+  fi
 
   _cleanup_uf2
 }

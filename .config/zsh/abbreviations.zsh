@@ -34,6 +34,5 @@ abbr -f -q rz="exec zsh"
 abbr -f -q z="cd"
 
 # Sofle Flashing Abbreviations
-abbr -f -q fr="flash_sofle hp_km right"
-abbr -f -q fl="flash_sofle hp_km left"
+abbr -f -q fs="flash_sofle hp_km"
 
